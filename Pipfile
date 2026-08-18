@@ -19,12 +19,12 @@ typing-extensions = "*"
 wtforms = "==3.1.2"
 sqlalchemy = "*"
 flask-jwt-extended = "*"
-flask-cors = "*"
 google-auth = "*"
 google-auth-oauthlib = "*"
 google-api-python-client = "*"
 google-auth-httplib2 = "*"
 flask-mail = "*"
+flask-cors = "*"
 
 [requires]
 python_version = "3.14"
