@@ -50,26 +50,57 @@ def login():
     # el Usuario encontrado ya trae su propio clinica_id.
     usuario = Usuario.query.filter_by(email=email).first()
 
-    if not usuario or not usuario.activo or not usuario.check_password(
-            password):
-        return jsonify(error="credenciales inválidas"), 401
+    if usuario and usuario.activo and usuario.check_password(password):
+        clinica = Clinica.query.get(usuario.clinica_id)
 
-    clinica = Clinica.query.get(usuario.clinica_id)
+        access_token = create_access_token(
+            identity=str(usuario.id),
+            additional_claims={
+                "rol": usuario.rol.value,
+                "nombre": usuario.nombre,
+                "clinica_id": usuario.clinica_id,
+            },
+            expires_delta=timedelta(hours=8),
+        )
 
-    access_token = create_access_token(
-        identity=str(usuario.id),
-        additional_claims={
-            "rol": usuario.rol.value,
-            "nombre": usuario.nombre,
-            "clinica_id": usuario.clinica_id,
-        },
-        expires_delta=timedelta(hours=8),
-    )
+        return jsonify(
+            access_token=access_token,
+            usuario=usuario.serialize(),
+            clinica=clinica.serialize())
 
-    return jsonify(
-        access_token=access_token,
-        usuario=usuario.serialize(),
-        clinica=clinica.serialize())
+      paciente = Paciente.query.filter_by(email=email).first()
+
+    if paciente and paciente.activo and paciente.check_password(password):
+        clinica = Clinica.query.get(paciente.clinica_id)
+
+        usuario_cliente = {
+            **paciente.serialize(),
+            "id": paciente.id,
+            "nombre": paciente.nombre_completo,
+            "rol": "cliente",
+            "paciente_id": paciente.id,
+            "clinica_id": paciente.clinica_id,
+            "debe_cambiar_password": False,
+        }
+
+        access_token = create_access_token(
+            identity=str(paciente.id),
+            additional_claims={
+                "rol": "cliente",
+                "nombre": paciente.nombre_completo,
+                "paciente_id": paciente.id,
+                "clinica_id": paciente.clinica_id,
+            },
+            expires_delta=timedelta(hours=8),
+        )
+
+        return jsonify(
+            access_token=access_token,
+            usuario=usuario_cliente,
+            clinica=clinica.serialize(),
+        )
+
+    return jsonify(error="credenciales inválidas"), 401        
 
 @auth.route("/google", methods=["POST"])
 def login_google():
