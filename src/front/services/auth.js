@@ -37,3 +37,11 @@ export const confirmarResetPassword = (token, passwordNueva) =>
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ token, password_nueva: passwordNueva })
 	});
+
+// POST /api/auth/google -> { access_token, usuario, tipo }
+export const loginGoogle = (credential, inviteToken = null) =>
+	request("/api/auth/google", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ credential, invite_token: inviteToken })
+	});

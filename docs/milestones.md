@@ -36,3 +36,17 @@ Meta interna de equipo: **21 de agosto de 2026**. Entrega oficial 4Geeks: **28 d
 - Recordatorios por WhatsApp (deep link con mensaje precargado).
 - Cierre de caja / conciliación con dinero físico-bancario.
 - Reporte automatizado de comisiones de fin de mes.
+
+## Después de M4 (no documentado hasta ahora, 2026-09-05)
+
+El desarrollo continuó después de la meta interna del 21 de agosto y de la entrega oficial de 4Geeks del 28 de agosto, con alcance real que no estaba en ningún milestone de este documento:
+
+- Pivote a multi-clínica (issue #66, PR #67, 2026-08-31).
+- Google Calendar por clínica en vez de cuenta compartida global (issue #71, PR #73).
+- Sistema de invitaciones para acceso de clientes/asistentes/especialistas (issue #68, PR #76).
+- UI de catálogo y paquetes, navbar rediseñado a sidebar (PR #77).
+- Login con Google para staff y pacientes (issue #69, PR #78, en revisión al momento de escribir esto).
+
+Falta que el equipo confirme si esto responde a una extensión formal del proyecto, trabajo post-entrega, u otro motivo, y si vale la pena declarar un M5 con alcance propio en vez de dejarlo suelto aquí.
+
+**Inventario (`Insumo`/`RecetaServicio`, prometido en M3) nunca se construyó** y no tiene issue de GitHub que lo haya rastreado — ver `modelo-datos.md`. A confirmar si se retoma o se da de baja del alcance.

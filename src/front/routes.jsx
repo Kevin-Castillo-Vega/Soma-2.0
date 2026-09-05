@@ -1,7 +1,7 @@
-// Import necessary components and functions from react-router-dom.
+import { createBrowserRouter, createRoutesFromElements, Route } from "react-router-dom";
 
-import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from "react-router-dom";
 import { Layout } from "./pages/Layout";
+import { ClienteLayout } from "./pages/ClienteLayout";
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
 import { OlvidePassword } from "./pages/OlvidePassword";
@@ -10,37 +10,55 @@ import { Single } from "./pages/Single";
 import { Demo } from "./pages/Demo";
 import { Espacios } from "./pages/Espacios";
 import { Agenda } from "./pages/Agenda";
+import { Ventas } from "./pages/Ventas";
+import { DashboardAdmin } from "./pages/DashboardAdmin";
+import { AppIndexRedirect } from "./components/AppIndexRedirect";
+import { NuevoServicio } from "./pages/NuevoServicio";
+import { ListaPacientes } from "./pages/ListaPacientes";
+import { NuevoPaciente } from "./pages/NuevoPaciente";
+import { Perfil } from "./pages/Perfil";
+import { GenerarInvite } from "./pages/GenerarInvite";
+import { RedimirInvite } from "./pages/RedimirInvite";
+import { Paquetes } from "./pages/Paquetes";
+import { Recibo } from "./pages/Recibo";
+import { ClienteDashboard } from "./pages/ClienteDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter(
 	createRoutesFromElements(
-		// CreateRoutesFromElements function allows you to build route elements declaratively.
-		// Create your routes here, if you want to keep the Navbar and Footer in all views, add your new routes inside the containing Route.
-		// Root, on the contrary, create a sister Route, if you have doubts, try it!
-		// Note: keep in mind that errorElement will be the default page when you don't get a route, customize that page to make your project more attractive.
-		// Note: The child paths of the Layout element replace the Outlet component with the elements contained in the "element" attribute of these child paths.
-
 		<>
-			{/* Landing pública en "/" — sister route, fuera del Layout genérico: tiene su propio nav/footer de marca. */}
 			<Route path="/" element={<Landing />} errorElement={<h1>Not found!</h1>} />
 
-			{/* Login — misma razón que Landing: chrome propio, no el Navbar/Footer boilerplate. */}
 			<Route path="/login" element={<Login />} errorElement={<h1>Not found!</h1>} />
+
 			<Route path="/olvide-password" element={<OlvidePassword />} errorElement={<h1>Not found!</h1>} />
-			{/* Path exacto esperado por el link del correo -- ver src/api/auth.py::_enviar_email_reset */}
+
 			<Route path="/restablecer-password" element={<RestablecerPassword />} errorElement={<h1>Not found!</h1>} />
 
-			{/* App autenticada bajo /app: ProtectedRoute exige sesión antes de mostrar el Layout compartido. */}
+			<Route path="/invite/:token" element={<RedimirInvite />} errorElement={<h1>Not found!</h1>} />
+
 			<Route path="/app" element={<ProtectedRoute />} errorElement={<h1>Not found!</h1>}>
+				{/* Staff application */}
 				<Route element={<Layout />}>
-					{/* Sin Dashboard real todavia (Vista 2 de docs/journey-usuario.md, modulo
-                de Francisco) -- redirige a Agenda en vez de mostrar el placeholder
-                del template. Cambiar aqui cuando el Dashboard aterrice. */}
-					<Route index element={<Navigate to="/app/agenda" replace />} />
-					<Route path="single/:theId" element={<Single />} /> {/* Dynamic route for single items */}
+					<Route index element={<AppIndexRedirect />} />
+					<Route path="dashboard" element={<DashboardAdmin />} />
+					<Route path="single/:theId" element={<Single />} />
 					<Route path="demo" element={<Demo />} />
 					<Route path="espacios" element={<Espacios />} />
 					<Route path="agenda" element={<Agenda />} />
+					<Route path="pacientes" element={<ListaPacientes />} />
+					<Route path="pacientes/nuevo" element={<NuevoPaciente />} />
+					<Route path="nuevo-servicio" element={<NuevoServicio />} />
+					<Route path="ventas" element={<Ventas />} />
+					<Route path="ventas/:id/recibo" element={<Recibo />} />
+					<Route path="perfil" element={<Perfil />} />
+					<Route path="invitaciones" element={<GenerarInvite />} />
+					<Route path="paquetes" element={<Paquetes />} />
+				</Route>
+
+				{/* Client portal */}
+				<Route path="cliente" element={<ClienteLayout />}>
+					<Route index element={<ClienteDashboard />} />
 				</Route>
 			</Route>
 		</>

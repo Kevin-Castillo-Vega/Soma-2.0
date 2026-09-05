@@ -4,6 +4,8 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+autopep8 = "*"
+pycodestyle = "*"
 
 [packages]
 flask = "*"
@@ -19,15 +21,15 @@ typing-extensions = "*"
 wtforms = "==3.1.2"
 sqlalchemy = "*"
 flask-jwt-extended = "*"
-flask-cors = "*"
 google-auth = "*"
 google-auth-oauthlib = "*"
 google-api-python-client = "*"
 google-auth-httplib2 = "*"
 flask-mail = "*"
+flask-cors = "*"
 
 [requires]
-python_version = "3.14"
+# python_version = "3.14"
 
 [scripts]
 start="flask run -p 3001 -h 0.0.0.0"

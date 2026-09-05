@@ -5,8 +5,8 @@ from flask_cors import CORS
 from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
 
 from api import google_calendar
-from api.decorators import rol_requerido
-from api.models import Cita, EstadoCita, db
+from api.decorators import clinica_id_actual, rol_requerido
+from api.models import Cita, EspacioTrabajo, EstadoCita, Paciente, Servicio, Usuario, db
 
 citas = Blueprint("citas", __name__, url_prefix="/api/citas")
 CORS(citas)
@@ -16,7 +16,7 @@ CORS(citas)
 DURACION_DEFAULT_MIN = 60
 
 
-def buscar_choque(campo, valor, fecha_hora, excluir_cita_id=None):
+def buscar_choque(campo, valor, fecha_hora, clinica_id, excluir_cita_id=None):
     if valor is None:
         return None
 
@@ -26,6 +26,7 @@ def buscar_choque(campo, valor, fecha_hora, excluir_cita_id=None):
     fin = fecha_hora + timedelta(minutes=DURACION_DEFAULT_MIN)
     inicio_choque = fecha_hora - timedelta(minutes=DURACION_DEFAULT_MIN)
     query = Cita.query.filter(
+        Cita.clinica_id == clinica_id,
         Cita.estado != EstadoCita.CANCELADA,
         getattr(Cita, campo) == valor,
         Cita.fecha_hora < fin,
@@ -49,7 +50,7 @@ def listar_citas():
     verify_jwt_in_request()
     claims = get_jwt()
 
-    query = Cita.query
+    query = Cita.query.filter(Cita.clinica_id == clinica_id_actual())
     if claims.get("rol") == "especialista":
         query = query.filter(Cita.especialista_id == int(get_jwt_identity()))
 
@@ -61,7 +62,7 @@ def obtener_cita(cita_id):
     verify_jwt_in_request()
     claims = get_jwt()
 
-    cita = Cita.query.get_or_404(cita_id)
+    cita = Cita.query.filter_by(id=cita_id, clinica_id=clinica_id_actual()).first_or_404()
     if claims.get("rol") == "especialista" and cita.especialista_id != int(get_jwt_identity()):
         return jsonify(error="no autorizado para este recurso"), 403
 
@@ -72,25 +73,40 @@ def obtener_cita(cita_id):
 @rol_requerido("admin", "asistente")
 def crear_cita():
     data = request.get_json(silent=True) or {}
+    clinica_id = clinica_id_actual()
 
     especialista_id = data.get("especialista_id")
     espacio_id = data.get("espacio_id")
+    paciente_id = data.get("paciente_id")
+    servicio_id = data.get("servicio_id")
     fecha_hora = _parsear_fecha_hora(data.get("fecha_hora"))
 
     if not especialista_id or not espacio_id or not fecha_hora:
         return jsonify(error="especialista_id, espacio_id y fecha_hora son requeridos"), 400
 
-    if buscar_choque("especialista_id", especialista_id, fecha_hora):
+    # Los ids llegan del cliente y ya no son suficientes por si solos para saber que le
+    # pertenecen a esta clinica (los ids son globales) -- se valida la pertenencia aqui.
+    if not Usuario.query.filter_by(id=especialista_id, clinica_id=clinica_id).first():
+        return jsonify(error="especialista_id no existe en esta clinica"), 404
+    if not EspacioTrabajo.query.filter_by(id=espacio_id, clinica_id=clinica_id).first():
+        return jsonify(error="espacio_id no existe en esta clinica"), 404
+    if paciente_id and not Paciente.query.filter_by(id=paciente_id, clinica_id=clinica_id).first():
+        return jsonify(error="paciente_id no existe en esta clinica"), 404
+    if servicio_id and not Servicio.query.filter_by(id=servicio_id, clinica_id=clinica_id).first():
+        return jsonify(error="servicio_id no existe en esta clinica"), 404
+
+    if buscar_choque("especialista_id", especialista_id, fecha_hora, clinica_id):
         return jsonify(error="la especialista ya tiene otra cita en ese horario"), 409
-    if buscar_choque("espacio_id", espacio_id, fecha_hora):
+    if buscar_choque("espacio_id", espacio_id, fecha_hora, clinica_id):
         return jsonify(error="el espacio ya esta ocupado en ese horario"), 409
 
     cita = Cita(
+        clinica_id=clinica_id,
         especialista_id=especialista_id,
         espacio_id=espacio_id,
         fecha_hora=fecha_hora,
-        paciente_id=data.get("paciente_id"),
-        servicio_id=data.get("servicio_id"),
+        paciente_id=paciente_id,
+        servicio_id=servicio_id,
         estado=EstadoCita.AGENDADA,
     )
     db.session.add(cita)
@@ -106,7 +122,8 @@ def crear_cita():
 def editar_cita(cita_id):
     verify_jwt_in_request()
     claims = get_jwt()
-    cita = Cita.query.get_or_404(cita_id)
+    clinica_id = clinica_id_actual()
+    cita = Cita.query.filter_by(id=cita_id, clinica_id=clinica_id).first_or_404()
 
     es_propia = cita.especialista_id == int(get_jwt_identity())
     if claims.get("rol") == "especialista" and not es_propia:
@@ -124,12 +141,17 @@ def editar_cita(cita_id):
     if nueva_fecha_hora is None:
         return jsonify(error="fecha_hora invalida"), 400
 
+    if nuevo_espacio_id != cita.espacio_id and not EspacioTrabajo.query.filter_by(id=nuevo_espacio_id, clinica_id=clinica_id).first():
+        return jsonify(error="espacio_id no existe en esta clinica"), 404
+    if nuevo_especialista_id != cita.especialista_id and not Usuario.query.filter_by(id=nuevo_especialista_id, clinica_id=clinica_id).first():
+        return jsonify(error="especialista_id no existe en esta clinica"), 404
+
     reprograma = nueva_fecha_hora != cita.fecha_hora or nuevo_espacio_id != cita.espacio_id or nuevo_especialista_id != cita.especialista_id
 
     if reprograma:
-        if buscar_choque("especialista_id", nuevo_especialista_id, nueva_fecha_hora, excluir_cita_id=cita.id):
+        if buscar_choque("especialista_id", nuevo_especialista_id, nueva_fecha_hora, clinica_id, excluir_cita_id=cita.id):
             return jsonify(error="la especialista ya tiene otra cita en ese horario"), 409
-        if buscar_choque("espacio_id", nuevo_espacio_id, nueva_fecha_hora, excluir_cita_id=cita.id):
+        if buscar_choque("espacio_id", nuevo_espacio_id, nueva_fecha_hora, clinica_id, excluir_cita_id=cita.id):
             return jsonify(error="el espacio ya esta ocupado en ese horario"), 409
 
     cita.fecha_hora = nueva_fecha_hora
@@ -150,7 +172,7 @@ def editar_cita(cita_id):
 def cancelar_cita(cita_id):
     verify_jwt_in_request()
     claims = get_jwt()
-    cita = Cita.query.get_or_404(cita_id)
+    cita = Cita.query.filter_by(id=cita_id, clinica_id=clinica_id_actual()).first_or_404()
 
     es_propia = cita.especialista_id == int(get_jwt_identity())
     if claims.get("rol") == "especialista" and not es_propia:

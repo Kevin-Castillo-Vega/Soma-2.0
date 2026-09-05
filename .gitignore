@@ -5,6 +5,7 @@
 !.gitignore
 !.github
 !.prettierrc
+!.prettierignore
 php_errorlog
 .log
 

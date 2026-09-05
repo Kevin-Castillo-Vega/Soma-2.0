@@ -4,7 +4,7 @@ import string
 from flask import Blueprint, jsonify, request
 from flask_cors import CORS
 
-from api.decorators import rol_requerido
+from api.decorators import clinica_id_actual, rol_requerido
 from api.models import RolUsuario, Usuario, db
 
 usuarios = Blueprint("usuarios", __name__, url_prefix="/api/usuarios")
@@ -23,7 +23,7 @@ def listar_usuarios():
     especialista al agendar una cita (ver docs/decisiones.md, matriz de permisos)."""
     rol = request.args.get("rol")
 
-    query = Usuario.query
+    query = Usuario.query.filter_by(clinica_id=clinica_id_actual())
     if rol:
         roles_validos = [r.value for r in RolUsuario]
         if rol not in roles_validos:
@@ -49,11 +49,18 @@ def crear_usuario():
     if rol not in roles_validos:
         return jsonify(error=f"rol invalido, debe ser uno de: {roles_validos}"), 400
 
+    # email es global y unico (#66), no solo dentro de esta clinica.
     if Usuario.query.filter_by(email=email).first():
         return jsonify(error="ya existe un usuario con ese email"), 409
 
     password_temporal = _generar_password_temporal()
-    usuario = Usuario(nombre=nombre, email=email, rol=RolUsuario(rol), debe_cambiar_password=True)
+    usuario = Usuario(
+        clinica_id=clinica_id_actual(),
+        nombre=nombre,
+        email=email,
+        rol=RolUsuario(rol),
+        debe_cambiar_password=True,
+    )
     usuario.set_password(password_temporal)
     db.session.add(usuario)
     db.session.commit()

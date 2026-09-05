@@ -1,39 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-paper text-ink font-body;
-  }
-  h1, h2, h3, h4 {
-    @apply font-display font-semibold;
-  }
+	body {
+		@apply bg-paper text-ink font-body;
+	}
+	h1,
+	h2,
+	h3,
+	h4 {
+		@apply font-display font-semibold;
+	}
 }
 
 @layer components {
-  /* Glass Light — tarjetas y modales elevados sobre fondo blanco */
-  .glass-light {
-    @apply bg-white/60 backdrop-blur-glass border border-white/65;
-  }
-  /* Glass Ink — overlays directamente sobre fotografía real (galería, antes/después) */
-  .glass-ink {
-    @apply bg-ink/45 backdrop-blur-glass border border-white/20 text-paper;
-  }
-  /* Fondo cálido tipo fotografía (gradiente, no imagen real) para hero e imágenes de producto */
-  .landing-hero-photo {
-    position: relative;
-    background:
-      radial-gradient(130% 90% at 90% 4%, rgba(255, 255, 255, 0.4), transparent 55%),
-      linear-gradient(150deg, #F1E4D5 0%, #E4CDAE 32%, #C79E77 64%, #86583A 100%);
-  }
-  .landing-hero-photo::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(200deg, transparent 45%, rgba(28, 24, 21, 0.3) 100%);
-  }
+	/* Glass Light — tarjetas y modales elevados sobre fondo blanco */
+	.glass-light {
+		@apply bg-white/60 backdrop-blur-glass border border-white/65;
+	}
+	/* Glass Ink — overlays directamente sobre fotografía real (galería, antes/después) */
+	.glass-ink {
+		@apply bg-ink/45 backdrop-blur-glass border border-white/20 text-paper;
+	}
+	/* Fondo cálido tipo fotografía (gradiente, no imagen real) para hero e imágenes de producto */
+	.landing-hero-photo {
+		position: relative;
+		background:
+			radial-gradient(130% 90% at 90% 4%, rgba(255, 255, 255, 0.4), transparent 55%),
+			linear-gradient(150deg, #f1e4d5 0%, #e4cdae 32%, #c79e77 64%, #86583a 100%);
+	}
+	.landing-hero-photo::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		background: linear-gradient(200deg, transparent 45%, rgba(28, 24, 21, 0.3) 100%);
+	}
 }

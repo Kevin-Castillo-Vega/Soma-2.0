@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify, url_for, send_from_directory
 from flask_migrate import Migrate
 from flask_swagger import swagger
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 from api.utils import APIException, generate_sitemap
 from api.models import db
 from api.extensions import mail
@@ -13,26 +14,49 @@ from api.routes import api
 from api.auth import auth
 from api.espacios import espacios
 from api.citas import citas
+from api.servicios import servicios
+from api.paquetes import paquetes
+from api.pacientes import pacientes
 from api.usuarios import usuarios
+from api.dashboard import dashboard
+from api.ventas import ventas
+from api.clinica import clinica
+from api.invites import invites
+from api.portal import portal
 from api.admin import setup_admin
 from api.commands import setup_commands
 
 # from models import Person
 
 ENV = "development" if os.getenv("FLASK_DEBUG") == "1" else "production"
-static_file_dir = os.path.join(os.path.dirname(
-    os.path.realpath(__file__)), '../dist/')
+static_file_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), '../dist/')
 app = Flask(__name__)
+
+origenes_permitidos = os.environ.get(
+    "FRONTEND_URL", "http://localhost:3000"
+).split(",")
+
+# En desarrollo/Codespaces permitimos * para no bloquear URLs dinamicas;
+# en produccion se respeta estrictamente el allowlist de FRONTEND_URL.
+if ENV == "development":
+    CORS(app, resources={r"/*": {"origins": "*"}})
+else:
+    CORS(app, origins=origenes_permitidos)
+
+
 app.url_map.strict_slashes = False
 
 # database condiguration
 db_url = os.getenv("DATABASE_URL")
 if db_url is not None:
-    # psycopg v3 (no psycopg2-binary -- sin wheels para Python 3.14+) requiere el driver explicito
+    # psycopg v3 (no psycopg2-binary -- sin wheels para Python 3.14+) requiere
+    # el driver explicito
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
     elif db_url.startswith("postgresql://") and "+psycopg" not in db_url:
-        db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        db_url = db_url.replace(
+            "postgresql://", "postgresql+psycopg://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:////tmp/test.db"
@@ -45,8 +69,10 @@ app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True') == 'True'
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME'))
-app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get(
+    'MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME'))
+app.config['FRONTEND_URL'] = os.environ.get(
+    'FRONTEND_URL', 'http://localhost:3000')
 
 MIGRATE = Migrate(app, db, compare_type=True)
 db.init_app(app)
@@ -59,12 +85,21 @@ setup_admin(app)
 # add the admin
 setup_commands(app)
 
-# Add all endpoints form the API with a "api" prefix
+# Add all endpoints form the API with an "api" prefix
 app.register_blueprint(api, url_prefix='/api')
 app.register_blueprint(auth)
 app.register_blueprint(espacios)
 app.register_blueprint(citas)
+app.register_blueprint(servicios)
+app.register_blueprint(paquetes)
+app.register_blueprint(pacientes)
 app.register_blueprint(usuarios)
+app.register_blueprint(dashboard)
+app.register_blueprint(ventas)
+app.register_blueprint(clinica)
+app.register_blueprint(invites)
+app.register_blueprint(portal)
+
 
 # Handle/serialize errors like a JSON object
 
@@ -83,6 +118,8 @@ def sitemap():
     return send_from_directory(static_file_dir, 'index.html')
 
 # any other endpoint will try to serve it like a static file
+
+
 @app.route('/<path:path>', methods=['GET'])
 def serve_any_other_file(path):
     if not os.path.isfile(os.path.join(static_file_dir, path)):

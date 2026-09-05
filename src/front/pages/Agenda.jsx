@@ -7,6 +7,8 @@ import useGlobalReducer from "../hooks/useGlobalReducer";
 import { listarCitas, crearCita, editarCita, cancelarCita } from "../services/citas";
 import { listarUsuarios } from "../services/usuarios";
 import { listarEspacios } from "../services/espacios";
+import { listarServicios } from "../services/servicios";
+import { buscarPacientePorTelefono, crearPaciente } from "../services/pacientes";
 
 // Cita todavia no guarda duracion (depende de Servicio.duracion_min, pendiente de Kevin)
 // -- mismo default de 60 min que usa el backend para chequear choques (ver src/api/citas.py).
@@ -48,11 +50,13 @@ export const Agenda = () => {
 	const [citas, setCitas] = useState([]);
 	const [especialistas, setEspecialistas] = useState([]);
 	const [espacios, setEspacios] = useState([]);
+	const [servicios, setServicios] = useState([]);
 	const [cargando, setCargando] = useState(true);
 	const [error, setError] = useState("");
 	const [modal, setModal] = useState(null); // null | { modo: "crear" | "editar", cita?, fechaHora? }
 	const [guardando, setGuardando] = useState(false);
 	const [errorModal, setErrorModal] = useState("");
+	const [buscandoPaciente, setBuscandoPaciente] = useState(false);
 
 	const cargarTodo = async () => {
 		setCargando(true);
@@ -61,13 +65,18 @@ export const Agenda = () => {
 			const promesas = [listarCitas(store.token)];
 			// Solo admin/asistente pueden crear citas -- no tiene sentido pedirles el resto a especialista.
 			if (puedeCrear) {
-				promesas.push(listarUsuarios(store.token, "especialista"), listarEspacios(store.token));
+				promesas.push(
+					listarUsuarios(store.token, "especialista"),
+					listarEspacios(store.token),
+					listarServicios(store.token)
+				);
 			}
-			const [citasResp, especialistasResp, espaciosResp] = await Promise.all(promesas);
+			const [citasResp, especialistasResp, espaciosResp, serviciosResp] = await Promise.all(promesas);
 			setCitas(citasResp);
 			if (puedeCrear) {
 				setEspecialistas(especialistasResp);
 				setEspacios(espaciosResp);
+				setServicios(serviciosResp);
 			}
 		} catch (err) {
 			setError(err.message);
@@ -107,7 +116,13 @@ export const Agenda = () => {
 			modo: "crear",
 			especialistaId: especialistas[0]?.id ?? "",
 			espacioId: espacios[0]?.id ?? "",
-			fechaHora: aInputDatetime(slotInfo.start)
+			servicioId: servicios[0]?.id ?? "",
+			fechaHora: aInputDatetime(slotInfo.start),
+			telefono: "",
+			paciente: null,
+			mostrarAltaPaciente: false,
+			nuevoNombre: "",
+			nuevaCedula: ""
 		});
 	};
 
@@ -125,9 +140,54 @@ export const Agenda = () => {
 
 	const cerrarModal = () => setModal(null);
 
+	// Busca el paciente por telefono (identificador acordado en docs/decisiones.md).
+	// Si no existe, ofrece el alta rapida sin salir del flujo de agendado (issue #7,
+	// camino A del journey) -- ver src/api/pacientes.py, GET /api/pacientes?telefono=.
+	const handleBuscarPaciente = async () => {
+		if (!modal.telefono) return;
+		setErrorModal("");
+		setBuscandoPaciente(true);
+		try {
+			const resultados = await buscarPacientePorTelefono(store.token, modal.telefono);
+			if (resultados.length > 0) {
+				setModal({ ...modal, paciente: resultados[0], mostrarAltaPaciente: false });
+			} else {
+				setModal({ ...modal, paciente: null, mostrarAltaPaciente: true });
+			}
+		} catch (err) {
+			setErrorModal(err.message);
+		} finally {
+			setBuscandoPaciente(false);
+		}
+	};
+
+	const handleCrearPacienteRapido = async () => {
+		if (!modal.nuevoNombre || !modal.nuevaCedula) return;
+		setErrorModal("");
+		setBuscandoPaciente(true);
+		try {
+			const paciente = await crearPaciente(store.token, {
+				nombreCompleto: modal.nuevoNombre,
+				cedula: modal.nuevaCedula,
+				telefono: modal.telefono
+			});
+			setModal({ ...modal, paciente, mostrarAltaPaciente: false });
+		} catch (err) {
+			setErrorModal(err.message);
+		} finally {
+			setBuscandoPaciente(false);
+		}
+	};
+
 	const handleGuardar = async (event) => {
 		event.preventDefault();
 		setErrorModal("");
+
+		if (modal.modo === "crear" && !modal.paciente) {
+			setErrorModal("Busca al paciente por teléfono (o dalo de alta) antes de agendar.");
+			return;
+		}
+
 		setGuardando(true);
 		try {
 			const fechaHoraIso = new Date(modal.fechaHora).toISOString();
@@ -135,7 +195,9 @@ export const Agenda = () => {
 				await crearCita(store.token, {
 					especialistaId: Number(modal.especialistaId),
 					espacioId: Number(modal.espacioId),
-					fechaHora: fechaHoraIso
+					fechaHora: fechaHoraIso,
+					pacienteId: modal.paciente.id,
+					servicioId: modal.servicioId ? Number(modal.servicioId) : null
 				});
 			} else if (puedeCrear) {
 				await editarCita(store.token, modal.cita.id, {
@@ -226,6 +288,90 @@ export const Agenda = () => {
 						) : null}
 
 						<form onSubmit={handleGuardar}>
+							{modal.modo === "crear" ? (
+								<div className="mb-4">
+									<label className="mb-1.5 block text-[13px] font-semibold text-ink-soft" htmlFor="telefono-paciente">
+										Paciente (buscar por teléfono)
+									</label>
+									<div className="flex gap-2">
+										<input
+											id="telefono-paciente"
+											type="tel"
+											required
+											className="w-full rounded-sm border-[1.5px] border-beige bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-cafe focus:ring-4 focus:ring-cafe/[0.14]"
+											value={modal.telefono}
+											onChange={(event) =>
+												setModal({ ...modal, telefono: event.target.value, paciente: null, mostrarAltaPaciente: false })
+											}
+											placeholder="4421234567"
+										/>
+										<button
+											type="button"
+											disabled={buscandoPaciente || !modal.telefono}
+											onClick={handleBuscarPaciente}
+											className="shrink-0 rounded-sm border-[1.5px] border-beige px-4 py-2.5 text-[14px] font-semibold text-ink-soft hover:border-cafe hover:text-cafe disabled:opacity-60"
+										>
+											{buscandoPaciente ? "Buscando…" : "Buscar"}
+										</button>
+									</div>
+
+									{modal.paciente ? (
+										<p className="mt-2 text-[13.5px] text-cafe">✓ {modal.paciente.nombre_completo}</p>
+									) : null}
+
+									{modal.mostrarAltaPaciente ? (
+										<div className="mt-3 rounded-sm border-[1.5px] border-dashed border-beige p-3">
+											<p className="mb-2 text-[13px] text-ink-soft">
+												No se encontró ningún paciente con ese teléfono. Da de alta uno nuevo:
+											</p>
+											<input
+												type="text"
+												className="mb-2 w-full rounded-sm border-[1.5px] border-beige bg-paper px-3 py-2 text-[14px] text-ink outline-none focus:border-cafe focus:ring-4 focus:ring-cafe/[0.14]"
+												placeholder="Nombre completo"
+												value={modal.nuevoNombre}
+												onChange={(event) => setModal({ ...modal, nuevoNombre: event.target.value })}
+											/>
+											<input
+												type="text"
+												className="mb-2 w-full rounded-sm border-[1.5px] border-beige bg-paper px-3 py-2 text-[14px] text-ink outline-none focus:border-cafe focus:ring-4 focus:ring-cafe/[0.14]"
+												placeholder="Cédula"
+												value={modal.nuevaCedula}
+												onChange={(event) => setModal({ ...modal, nuevaCedula: event.target.value })}
+											/>
+											<button
+												type="button"
+												disabled={buscandoPaciente || !modal.nuevoNombre || !modal.nuevaCedula}
+												onClick={handleCrearPacienteRapido}
+												className="rounded-full bg-ink px-4 py-2 text-[13px] font-bold text-paper hover:bg-cafe disabled:opacity-60"
+											>
+												{buscandoPaciente ? "Guardando…" : "Crear y continuar"}
+											</button>
+										</div>
+									) : null}
+								</div>
+							) : null}
+
+							{modal.modo === "crear" ? (
+								<div className="mb-4">
+									<label className="mb-1.5 block text-[13px] font-semibold text-ink-soft" htmlFor="servicio">
+										Servicio
+									</label>
+									<select
+										id="servicio"
+										className="w-full rounded-sm border-[1.5px] border-beige bg-paper px-4 py-2.5 text-[15px] text-ink outline-none focus:border-cafe focus:ring-4 focus:ring-cafe/[0.14]"
+										value={modal.servicioId}
+										onChange={(event) => setModal({ ...modal, servicioId: event.target.value })}
+									>
+										<option value="">Sin especificar</option>
+										{servicios.map((servicio) => (
+											<option key={servicio.id} value={servicio.id}>
+												{servicio.nombre} · {servicio.duracion_min} min
+											</option>
+										))}
+									</select>
+								</div>
+							) : null}
+
 							{puedeCrear ? (
 								<>
 									<div className="mb-4">
